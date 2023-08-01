@@ -88,6 +88,7 @@
 
 (require 'evil)
 (require 'cl-lib)
+(require 'ring)
 
 (eval-when-compile
   (declare-function evil-iedit-state/quit-iedit-mode "evil-iedit-state.el"))
@@ -112,12 +113,6 @@
   :type 'number
   :group 'evil-escape)
 
-(defcustom evil-escape-unordered-key-sequence nil
-  "If non-nil then the key sequence can also be entered with the second
-key first."
-  :type 'boolean
-  :group 'evil-escape)
-
 (defcustom evil-escape-excluded-major-modes nil
   "Excluded major modes where escape sequences have no effect."
   :type 'sexp
@@ -139,8 +134,20 @@ key first."
   :type 'sexp
   :group 'evil-escape)
 
+(defcustom evil-escape-hook nil "functions to run on escaping")
+
 (defvar evil-escape-inhibit nil
   "When non nil evil-escape is inhibited.")
+
+(defvar evil-escape-ring (make-ring 2))
+
+(defvar evil-escape-last-time (float-time))
+
+(defvar evil-escape-trigger-passed nil)
+
+(defvar evil-escape--key1 nil)
+
+(defvar evil-escape--key2 nil)
 
 ;;;###autoload
 (define-minor-mode evil-escape-mode
@@ -150,8 +157,14 @@ with a key sequence."
   :group 'evil
   :global t
   (if evil-escape-mode
-      (add-hook 'pre-command-hook 'evil-escape-pre-command-hook)
-    (remove-hook 'pre-command-hook 'evil-escape-pre-command-hook)))
+      (progn
+        (setq evil-escape--key1 (elt evil-escape-key-sequence 0)
+              evil-escape--key2 (elt evil-escape-key-sequence 1)
+              )
+        (add-hook 'pre-command-hook #'evil-escape-pre-command-hook)
+        (add-hook 'post-command-hook #'evil-escape-post-command-hook-plus))
+    (remove-hook 'pre-command-hook #'evil-escape-pre-command-hook)
+    (remove-hook 'post-command-hook #'evil-escape-post-command-hook-plus)))
 
 (defun evil-escape ()
   "Escape from everything... well almost everything."
@@ -177,43 +190,41 @@ with a key sequence."
     (_ (evil-escape--escape-normal-state))))
 
 (defun evil-escape-pre-command-hook ()
-  "evil-escape pre-command hook."
+  " add to pre-command-hook to listen for keyboard events,
+and intercept them if they match the evil-escape-key-sequence "
   (with-demoted-errors "evil-escape: Error %S"
-      (when (evil-escape-p)
-        (let* (;; NOTE Add syl20bnr/evil-escape#91: inhibit redisplay and
-               ;;      refontification after a `read-event'.
-               (inhibit-redisplay nil)
-               (fontification-functions nil)
+    (evil-escape-update-state)
+    (when (and evil-escape-trigger-passed (evil-escape-p))
+      (let ((inhibit-redisplay nil)
+            (fontification-functions nil)
+            (esc-fun (evil-escape-func)))
+        (evil-repeat-stop)
+        (when esc-fun ;; override the command
+          (when (eq this-command 'self-insert-command)
+            (delete-char -1))
+          (setq this-command esc-fun
+                this-original-command esc-fun))))
+        ))
 
-               (modified (buffer-modified-p))
-               (inserted (evil-escape--insert))
-               (fkey (elt evil-escape-key-sequence 0))
-               (skey (elt evil-escape-key-sequence 1))
-               (evt (read-event nil nil evil-escape-delay)))
-          (when inserted (evil-escape--delete))
-          ;; NOTE Add syl20bnr/evil-escape#91: replace `set-buffer-modified-p'
-          ;;      with `restore-buffer-modified-p', which doesn't redisplay the
-          ;;      modeline after changing the buffer's modified state.
-          (restore-buffer-modified-p modified)
-          (cond
-           ((and (characterp evt)
-                 (or (and (equal (this-command-keys) (evil-escape--first-key))
-                          (char-equal evt skey))
-                     (and evil-escape-unordered-key-sequence
-                          (equal (this-command-keys) (evil-escape--second-key))
-                          (char-equal evt fkey))))
-            (evil-repeat-stop)
-            (let ((esc-fun (evil-escape-func)))
-              (when esc-fun
-                (setq this-command esc-fun)
-                (setq this-original-command esc-fun))))
-           ((null evt))
-           ;; NOTE Add syl20bnr/evil-escape#93: replace with
-           ;;      `unread-command-events' with
-           ;;      `unread-post-input-method-events' so evil-escape doesn't
-           ;;      interfere with macro recording.
-           ((setq unread-post-input-method-events
-                  (append unread-post-input-method-events (list evt)))))))))
+(defun evil-escape-update-state ()
+  " add events to the escape ring, record the time the last matching event happened,
+then set the flag for whether the condition has been met"
+  (ring-insert evil-escape-ring last-input-event)
+  (when (eq (ring-ref evil-escape-ring 0) evil-escape--key1)
+    (setq evil-escape-last-time (float-time)))
+  (setq evil-escape-trigger-passed (and (eq (ring-ref evil-escape-ring 0) evil-escape--key2)
+                                        (eq (ring-ref evil-escape-ring 1) evil-escape--key1)
+                                        (<= (- (float-time) evil-escape-last-time) evil-escape-delay)
+                                        )
+        )
+  )
+
+(defun evil-escape-post-command-hook-plus ()
+  " add to post-command-hook as necessary "
+  (when evil-escape-trigger-passed
+    (run-hooks 'evil-escape-hook)
+    )
+  )
 
 (defadvice evil-repeat (around evil-escape-repeat-info activate)
   (let ((evil-escape-inhibit t))
@@ -229,19 +240,18 @@ with a key sequence."
                               image-mode))
            (evil-escape--is-magit-buffer)
            (and (fboundp 'helm-alive-p) (helm-alive-p))
-           (or (not (eq 'normal evil-state))
+           (or (not (eq 'motion evil-state))
                (not (eq 'evil-force-normal-state
                         (lookup-key evil-normal-state-map [escape])))))
        (not (memq major-mode evil-escape-excluded-major-modes))
        (not (memq evil-state evil-escape-excluded-states))
        (or (not evil-escape-enable-only-for-major-modes)
            (memq major-mode evil-escape-enable-only-for-major-modes))
-       (or (equal (this-command-keys) (evil-escape--first-key))
-           (and evil-escape-unordered-key-sequence
-                (equal (this-command-keys) (evil-escape--second-key))))
        (not (cl-reduce (lambda (x y) (or x y))
                        (mapcar 'funcall evil-escape-inhibit-functions)
                        :initial-value nil))))
+
+;; TODO : refactor these to just be in the hook
 
 (defun evil-escape--escape-normal-state ()
   "Return the function to escape from normal state."
@@ -282,64 +292,6 @@ with a key sequence."
                        image-mode)) 'quit-window)
    (t 'evil-normal-state)))
 
-(defun evil-escape--first-key ()
-  "Return the first key string in the key sequence."
-  (let* ((first-key (elt evil-escape-key-sequence 0))
-         (fkeystr (char-to-string first-key)))
-    fkeystr))
-
-(defun evil-escape--second-key ()
-  "Return the second key string in the key sequence."
-  (let* ((sec-key (elt evil-escape-key-sequence 1))
-         (fkeystr (char-to-string sec-key)))
-    fkeystr))
-
-(defun evil-escape--insert-func ()
-  "Default insert function."
-  (when (not buffer-read-only) (self-insert-command 1)))
-
-(defun evil-escape--delete-func ()
-  "Delete char in current buffer if not read only."
-  (when (not buffer-read-only) (delete-char -1)))
-
-(defun evil-escape--insert ()
-  "Insert the first key of the sequence."
-  (condition-case err
-      (pcase evil-state
-        (`insert (evil-escape--insert-2) t)
-        (`emacs (evil-escape--insert-2) t)
-        (`hybrid (evil-escape--insert-2) t)
-        (`normal
-         (when (window-minibuffer-p) (evil-escape--insert-func) t))
-        (`iedit-insert (evil-escape--insert-func) t))
-    ('error nil)))
-
-(defun evil-escape--insert-2 ()
-  "Insert character while taking into account mode specificites."
-  (pcase major-mode
-    (`term-mode (call-interactively 'term-send-raw))
-    (_ (cond
-        ((bound-and-true-p isearch-mode) (isearch-printing-char))
-        (t (evil-escape--insert-func))))))
-
-(defun evil-escape--delete ()
-  "Revert the insertion of the first key of the sequence."
-  (pcase evil-state
-    (`insert (evil-escape--delete-2))
-    (`emacs (evil-escape--delete-2))
-    (`hybrid (evil-escape--delete-2))
-    (`normal
-     (when (minibuffer-window-active-p (evil-escape--delete-func))))
-    (`iedit-insert (evil-escape--delete-func))))
-
-(defun evil-escape--delete-2 ()
-  "Delete character while taking into account mode specifities."
-  (pcase major-mode
-    (`term-mode (call-interactively 'term-send-backspace))
-    (_ (cond
-        ((bound-and-true-p isearch-mode) (isearch-delete-char))
-        (t (evil-escape--delete-func))))))
-
 (defun evil-escape--escape-with-q ()
   "Send `q' key press event to exit from a buffer."
   (interactive)
@@ -348,6 +300,17 @@ with a key sequence."
 (defun evil-escape--is-magit-buffer ()
   "Return non nil if the current buffer is a Magit buffer."
   (string-match-p "magit" (symbol-name major-mode)))
+
+(defun evil-escape-check-ring ()
+  "for debugging"
+  (interactive)
+  (message "evil escape ring: |%s| %s : %s : %s"
+           (string-join (mapcar (lambda (x) (format "%c" x)) (ring-elements evil-escape-ring)) "")
+           (this-command-keys-vector)
+           this-command
+           last-command
+           )
+  )
 
 (provide 'evil-escape)
 
