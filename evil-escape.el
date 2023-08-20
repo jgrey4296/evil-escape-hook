@@ -1,5 +1,8 @@
  ;;; evil-escape.el --- Escape from anything with a customizable key sequence -*- lexical-binding: t; -*-
 
+;; Forked and Refactored 2023 by John Grey
+
+;; Original:
 ;; Copyright (C) 2014-2015 syl20bnr
 ;;
 ;; Author: Sylvain Benner <sylvain.benner@gmail.com>
