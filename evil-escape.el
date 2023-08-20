@@ -169,9 +169,9 @@ with a key sequence."
 (defun evil-escape ()
   "Escape from everything... well almost everything."
   (interactive)
-  (call-interactively (evil-escape-func)))
+  (call-interactively (evil-escape--get-appropriate-func)))
 
-(defun evil-escape-func ()
+(defun evil-escape--get-appropriate-func ()
   "Return the function to escape from everything."
   (pcase evil-state
     (`normal (evil-escape--escape-normal-state))
@@ -197,10 +197,11 @@ and intercept them if they match the evil-escape-key-sequence "
     (when (and evil-escape-trigger-passed (evil-escape-p))
       (let ((inhibit-redisplay nil)
             (fontification-functions nil)
-            (esc-fun (evil-escape-func)))
+            (esc-fun (evil-escape--get-appropriate-func)))
         (evil-repeat-stop)
         (when esc-fun ;; override the command
-          (when (eq this-command 'self-insert-command)
+          (when (and (eq this-command 'self-insert-command)
+                     (not buffer-read-only))
             (delete-char -1))
           (setq this-command esc-fun
                 this-original-command esc-fun))))
