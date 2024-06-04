@@ -1,7 +1,8 @@
 #+title: Evil Escape Todos
+#+STARTUP: agenda
 
 * Evil Escape Todos
 :PROPERTIES:
 :ID:       b48c9b2e-2ca1-4be1-aa67-2ce5cf262564
 :END:
-** edit evil repeat list
+** [∅] edit evil repeat list
