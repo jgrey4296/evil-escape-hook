@@ -92,6 +92,7 @@
 (require 'evil)
 (require 'cl-lib)
 (require 'ring)
+(require 'dash)
 
 (eval-when-compile
   (declare-function evil-iedit-state/quit-iedit-mode "evil-iedit-state.el"))
@@ -189,19 +190,17 @@ with a key sequence."
 (defun evil-escape--get-appropriate-func ()
   "Return the function to escape from everything."
   (pcase evil-state
-    (`normal (evil-escape--escape-normal-state))
-    (`motion (evil-escape--escape-motion-state))
-    (`insert 'evil-normal-state)
-    (`emacs (evil-escape--escape-emacs-state))
-    (`hybrid (evil-escape--escape-emacs-state))
-    (`evilified (evil-escape--escape-emacs-state))
-    (`visual 'evil-exit-visual-state)
-    (`replace 'evil-normal-state)
-    (`lisp 'evil-lisp-state/quit)
-    (`iedit 'evil-iedit-state/quit-iedit-mode)
-    (`iedit-insert 'evil-iedit-state/quit-iedit-mode)
-    (`multiedit 'evil-multiedit-abort)
-    (`multiedit-insert 'evil-multiedit-state)
+    ('normal (evil-escape--escape-normal-state))
+    ('motion (evil-escape--escape-motion-state))
+    ((or 'emacs 'hybrid 'evilified) (evil-escape--escape-emacs-state))
+    ('insert           'evil-normal-state)
+    ('visual           'evil-exit-visual-state)
+    ('replace          'evil-normal-state)
+    ('lisp             'evil-lisp-state/quit)
+    ('iedit            'evil-iedit-state/quit-iedit-mode)
+    ('iedit-insert     'evil-iedit-state/quit-iedit-mode)
+    ('multiedit        'evil-multiedit-abort)
+    ('multiedit-insert 'evil-multiedit-state)
     (_ (evil-escape--escape-normal-state))))
 
 (defun evil-escape-pre-command-hook ()
@@ -210,7 +209,7 @@ and intercept them if they match the evil-escape-key-sequence "
   (with-demoted-errors "evil-escape: Error %S"
     (evil-escape-update-state)
     (when (and evil-escape-trigger-passed (evil-escape-p))
-      (let ((inhibit-redisplay nil)
+      (let ((inhibit-redisplay t)
             (fontification-functions nil)
             (esc-fun (evil-escape--get-appropriate-func)))
         (evil-repeat-stop)
@@ -275,10 +274,13 @@ Including the mode blacklist and whitelist, and state blacklist
   )
 
 (defun evil-escape--escape-normal-state ()
-  "Return the function to escape from normal state."
+  "Return the function to escape from normal state.
+TODO make this a lookup by mode
+"
   (cond
-   ((and (fboundp 'helm-alive-p) (helm-alive-p)) 'helm-keyboard-quit)
-   ((eq 'ibuffer-mode major-mode) 'ibuffer-quit)
+   ((and (boundp 'helm-alive-p) helm-alive-p) 'helm-keyboard-quit)
+   ((eq 'neotree-mode major-mode) 'neotree-hide)
+   ((eq 'ibuffer-mode major-mode) 'kill-current-buffer)
    ((eq 'image-mode major-mode) 'quit-window)
    ((evil-escape--is-magit-buffer) 'evil-escape--escape-with-q)
    ((bound-and-true-p isearch-mode) 'isearch-abort)
@@ -288,17 +290,18 @@ Including the mode blacklist and whitelist, and state blacklist
 (defun evil-escape--escape-motion-state ()
   "Return the function to escape from motion state."
   (cond
-   ((or (memq major-mode '(apropos-mode
-                           help-mode
-                           ert-results-mode
-                           ert-simple-view-mode
-                           compilation-mode
-                           image-mode))) 'quit-window)
    ((eq 'undo-tree-visualizer-mode major-mode) 'undo-tree-visualizer-quit)
-   ((and (fboundp 'helm-ag--edit-abort)
-         (string-equal "*helm-ag-edit*" (buffer-name))) 'helm-ag--edit-abort)
    ((eq 'neotree-mode major-mode) 'neotree-hide)
-   (t 'evil-normal-state)))
+   ((and (fboundp 'helm-ag--edit-abort) (string-equal "*helm-ag-edit*" (buffer-name))) 'helm-ag--edit-abort)
+   ((apply #'derived-mode-p  '(apropos-mode
+                               help-mode
+                               ert-results-mode
+                               ert-simple-view-mode
+                               compilation-mode
+                               image-mode))
+    'quit-window)
+   (t 'evil-normal-state))
+  )
 
 (defun evil-escape--escape-emacs-state ()
   "Return the function to escape from emacs state."
@@ -320,7 +323,8 @@ Including the mode blacklist and whitelist, and state blacklist
 
 (defun evil-escape--is-magit-buffer ()
   "Return non nil if the current buffer is a Magit buffer."
-  (string-match-p "magit" (symbol-name major-mode)))
+  (string-match-p "magit" (symbol-name major-mode))
+  )
 
 (defun evil-escape-check-ring ()
   "for debugging"
