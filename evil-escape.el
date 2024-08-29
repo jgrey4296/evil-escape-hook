@@ -116,26 +116,34 @@
   :type 'number
   :group 'evil-escape)
 
-(defcustom evil-escape-excluded-major-modes nil
+(defcustom evil-escape-major-mode-blacklist nil
   "Excluded major modes where escape sequences have no effect."
   :type 'sexp
   :group 'evil-escape)
 
-(defcustom evil-escape-excluded-states nil
-  "Excluded states where escape sequences have no effect."
-  :type 'sexp
-  :group 'evil-escape)
-
-(defcustom evil-escape-enable-only-for-major-modes nil
+(defcustom evil-escape-major-mode-whitelist nil
   "List of major modes where evil-escape is enabled."
   :type 'sexp
   :group 'evil-escape)
 
-(defcustom evil-escape-inhibit-functions nil
+(defcustom evil-escape-state-blacklist nil
+  "Excluded states where escape sequences have no effect."
+  :type 'sexp
+  :group 'evil-escape)
+
+(defvaralias 'evil-escape-excluded-major-modes 'evil-escape-major-mode-blacklist)
+
+(defvaralias 'evil-escape-excluded-states 'evil-escape-state-blacklist)
+
+(defvaralias 'evil-escape-enable-only-for-major-modes 'evil-escape-major-mode-whitelist)
+
+(defcustom evil-escape-inhibitor-hook nil
   "List of zero argument predicate functions disabling evil-escape.
  If any of these functions return non nil, evil escape will be inhibited."
   :type 'sexp
   :group 'evil-escape)
+
+(defvaralias 'evil-escape-inhibit-functions 'evil-escape-inhibitor-hook)
 
 (defcustom evil-escape-hook nil "functions to run on escaping")
 
@@ -240,24 +248,25 @@ then set the flag for whether the condition has been met"
   "Return non-nil if evil-escape can run."
   (and evil-escape-key-sequence
        (not evil-escape-inhibit)
-       (or (window-minibuffer-p)
-           (bound-and-true-p isearch-mode)
-           (memq major-mode '(ibuffer-mode
-                              image-mode))
-           (evil-escape--is-magit-buffer)
-           (and (fboundp 'helm-alive-p) (helm-alive-p))
-           (or (not (eq 'motion evil-state))
-               (not (eq 'evil-force-normal-state
-                        (lookup-key evil-normal-state-map [escape])))))
-       (not (memq major-mode evil-escape-excluded-major-modes))
-       (not (memq evil-state evil-escape-excluded-states))
-       (or (not evil-escape-enable-only-for-major-modes)
-           (memq major-mode evil-escape-enable-only-for-major-modes))
-       (not (cl-reduce (lambda (x y) (or x y))
-                       (mapcar 'funcall evil-escape-inhibit-functions)
-                       :initial-value nil))))
+       (not (-any? #'funcall evil-escape-inhibitor-hook))
+       )
+  )
 
-;; TODO : refactor these to just be in the hook
+(defun evil-escape-add-default-inhibitors ()
+  "Add default inhibitor functions to `evil-escape-inhibit-functions',
+Including the mode blacklist and whitelist, and state blacklist
+"
+  (add-hook 'evil-escape-inhibitor-hook #'(lambda () (apply #'derived-mode-p evil-escape-major-mode-blacklist)))
+  (add-hook 'evil-escape-inhibitor-hook #'(lambda () (memq evil-state evil-escape-state-blacklist)))
+  (add-hook 'evil-escape-inhibitor-hook #'(lambda () (and evil-escape-major-mode-whitelist
+                                                         (not (apply #'derived-mode-p evil-escape-major-mode-whitelist)))))
+
+  ;; (add-hook 'evil-escape-inhibitor-hook #'window-minibuffer-p)
+  (add-hook 'evil-escape-inhibitor-hook #'(lambda () (bound-and-true-p isearch-mode)))
+  (add-hook 'evil-escape-inhibitor-hook #'evil-escape--is-magit-buffer)
+  (add-hook 'evil-escape-inhibitor-hook #'(lambda () (and (boundp 'helm-alive-p) helm-alive-p)))
+
+  )
 
 (defun evil-escape--escape-normal-state ()
   "Return the function to escape from normal state."
