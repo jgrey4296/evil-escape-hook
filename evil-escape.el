@@ -156,6 +156,8 @@
 
 (defvar evil-escape-last-time (float-time))
 
+(defvar evil-escape-modified-on-key1 nil)
+
 (defvar evil-escape-trigger-passed nil)
 
 (defvar evil-escape--key1 nil)
@@ -217,7 +219,9 @@ and intercept them if they match the evil-escape-key-sequence "
                      (not buffer-read-only))
             (delete-char -1))
           (setq this-command esc-fun
-                this-original-command esc-fun))))
+                this-original-command esc-fun)
+          (set-buffer-modified-p evil-escape-modified-on-key1)
+          )))
         ))
 
 (defun evil-escape-update-state ()
@@ -225,7 +229,9 @@ and intercept them if they match the evil-escape-key-sequence "
 then set the flag for whether the condition has been met"
   (ring-insert evil-escape-ring last-input-event)
   (when (eq (ring-ref evil-escape-ring 0) evil-escape--key1)
-    (setq evil-escape-last-time (float-time)))
+    (setq evil-escape-last-time (float-time)
+          evil-escape-modified-on-key1 (buffer-modified-p)
+          ))
   (setq evil-escape-trigger-passed (and (eq (ring-ref evil-escape-ring 0) evil-escape--key2)
                                         (eq (ring-ref evil-escape-ring 1) evil-escape--key1)
                                         (<= (- (float-time) evil-escape-last-time) evil-escape-delay)
