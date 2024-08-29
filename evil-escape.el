@@ -148,7 +148,8 @@
 
 (defcustom evil-escape-hook nil "functions to run on escaping")
 
-(defcustom evil-escape-delete-char-on-fns '(self-insert-command org-self-insert-command) "Function symbols to delete the previous inserted char. usually self-insert-command and org-self-insert-command")
+(defcustom evil-escape-delete-char-on-fns '(self-insert-command org-self-insert-command)
+  "Function symbols to delete the previous inserted char. usually self-insert-command and org-self-insert-command")
 
 (defvar evil-escape-inhibit nil
   "When non nil evil-escape is inhibited.")
@@ -209,7 +210,7 @@ and intercept them if they match the evil-escape-key-sequence "
   (with-demoted-errors "evil-escape: Error %S"
     (evil-escape-update-state)
     (when (and evil-escape-trigger-passed (evil-escape-p))
-      (let ((inhibit-redisplay t)
+      (let ((inhibit-redisplay nil)
             (fontification-functions nil)
             (esc-fun (evil-escape--get-appropriate-func)))
         (evil-repeat-stop)
@@ -257,6 +258,7 @@ then set the flag for whether the condition has been met"
        )
   )
 
+;;;###autoload
 (defun evil-escape-add-default-inhibitors ()
   "Add default inhibitor functions to `evil-escape-inhibit-functions',
 Including the mode blacklist and whitelist, and state blacklist
