@@ -65,16 +65,16 @@
 ;; The key sequence can be entered in any order by setting
 ;; the variable `evil-escape-unordered-key-sequence' to non nil.
 
-;; A major mode can be excluded by adding it to the list
-;; `evil-escape-excluded-major-modes'.
+;; A major mode and its derivations can be excluded by adding it to the list
+;; `evil-escape--major-mode-blacklist'
 
 ;; An inclusive list of major modes can defined with the variable
-;; `evil-escape-enable-only-for-major-modes'. When this list is
+;; `evil-escape--major-mode-whitelist'. When this list is
 ;; non-nil then evil-escape is enabled only for the major-modes
 ;; in the list.
 
 ;; A list of zero arity functions can be defined with the variable
-;; `evil-escape-inhibit-functions', if any of these functions return
+;; `evil-escape-inhibitor-hook', if any of these functions return
 ;; non nil then evil-escape is inhibited.
 ;; It is also possible to inhibit evil-escape in a let binding by
 ;; setting the `evil-escape-inhibit' variable to non nil.
@@ -263,17 +263,26 @@ then set the flag for whether the condition has been met"
   "Add default inhibitor functions to `evil-escape-inhibit-functions',
 Including the mode blacklist and whitelist, and state blacklist
 "
-  (add-hook 'evil-escape-inhibitor-hook #'(lambda () (apply #'derived-mode-p evil-escape-major-mode-blacklist)))
-  (add-hook 'evil-escape-inhibitor-hook #'(lambda () (memq evil-state evil-escape-state-blacklist)))
-  (add-hook 'evil-escape-inhibitor-hook #'(lambda () (and evil-escape-major-mode-whitelist
-                                                         (not (apply #'derived-mode-p evil-escape-major-mode-whitelist)))))
+  (add-hook 'evil-escape-inhibitor-hook #'evil-escape--derived-from-blacklist)
+  (add-hook 'evil-escape-inhibitor-hook #'evil-escape--state-in-blacklist)
+  (add-hook 'evil-escape-inhibitor-hook #'evil-escape--whitelist)
 
   ;; (add-hook 'evil-escape-inhibitor-hook #'window-minibuffer-p)
-  (add-hook 'evil-escape-inhibitor-hook #'(lambda () (bound-and-true-p isearch-mode)))
+  (add-hook 'evil-escape-inhibitor-hook #'evil-escape--inhibit-isearch)
   (add-hook 'evil-escape-inhibitor-hook #'evil-escape--is-magit-buffer)
-  (add-hook 'evil-escape-inhibitor-hook #'(lambda () (and (boundp 'helm-alive-p) helm-alive-p)))
+  (add-hook 'evil-escape-inhibitor-hook #'evil-escape--inhibit-helm)
 
   )
+
+(defun evil-escape--derived-from-blacklist () (apply #'derived-mode-p evil-escape-major-mode-blacklist))
+
+(defun evil-escape--state-in-blacklist () (memq evil-state evil-escape-state-blacklist))
+
+(defun evil-escape--whitelist () (and evil-escape-major-mode-whitelist (not (apply #'derived-mode-p evil-escape-major-mode-whitelist))))
+
+(defun evil-escape--inhibit-isearch () (bound-and-true-p isearch-mode))
+
+(defun evil-escape--inhibit-helm () (and (boundp 'helm-alive-p) helm-alive-p))
 
 (defun evil-escape--escape-normal-state ()
   "Return the function to escape from normal state.
