@@ -179,9 +179,12 @@ with a key sequence."
               evil-escape--key2 (elt evil-escape-key-sequence 1)
               )
         (add-hook 'pre-command-hook #'evil-escape-pre-command-hook)
-        (add-hook 'post-command-hook #'evil-escape-post-command-hook-plus))
+        (add-hook 'post-command-hook #'evil-escape-post-command-hook-plus)
+        )
     (remove-hook 'pre-command-hook #'evil-escape-pre-command-hook)
-    (remove-hook 'post-command-hook #'evil-escape-post-command-hook-plus)))
+    (remove-hook 'post-command-hook #'evil-escape-post-command-hook-plus)
+    )
+  )
 
 (defun evil-escape ()
   "Escape from everything... well almost everything."
@@ -213,19 +216,22 @@ and intercept them if they match the evil-escape-key-sequence "
       (let ((inhibit-redisplay nil)
             (fontification-functions nil)
             (esc-fun (evil-escape--get-appropriate-func)))
-        (evil-repeat-stop)
-        (when esc-fun ;; override the command
+        (when esc-fun
           (when (and (memq this-command evil-escape-delete-char-on-fns)
                      (not buffer-read-only))
             (delete-char -1))
+          ;; Because this is in pre-command-hook,
+          ;; setting this-command and this-original-command changes what will happen
           (setq this-command esc-fun
                 this-original-command esc-fun)
+          ;; Don't count the escape keys for modification:
           (set-buffer-modified-p evil-escape-modified-on-key1)
           )))
         ))
 
 (defun evil-escape-update-state ()
-  " add events to the escape ring, record the time the last matching event happened,
+  " add events to the escape ring,
+record the time the last matching event happened,
 then set the flag for whether the condition has been met"
   (ring-insert evil-escape-ring last-input-event)
   (when (eq (ring-ref evil-escape-ring 0) evil-escape--key1)
@@ -245,10 +251,6 @@ then set the flag for whether the condition has been met"
     (run-hooks 'evil-escape-hook)
     )
   )
-
-(defadvice evil-repeat (around evil-escape-repeat-info activate)
-  (let ((evil-escape-inhibit t))
-    ad-do-it))
 
 (defun evil-escape-p ()
   "Return non-nil if evil-escape can run."
