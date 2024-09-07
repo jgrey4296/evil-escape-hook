@@ -269,11 +269,8 @@ Including the mode blacklist and whitelist, and state blacklist
   (add-hook 'evil-escape-inhibitor-hook #'evil-escape--state-in-blacklist)
   (add-hook 'evil-escape-inhibitor-hook #'evil-escape--whitelist)
 
-  ;; (add-hook 'evil-escape-inhibitor-hook #'window-minibuffer-p)
   (add-hook 'evil-escape-inhibitor-hook #'evil-escape--inhibit-isearch)
   (add-hook 'evil-escape-inhibitor-hook #'evil-escape--is-magit-buffer)
-  (add-hook 'evil-escape-inhibitor-hook #'evil-escape--inhibit-helm)
-
   )
 
 (defun evil-escape--derived-from-blacklist () (apply #'derived-mode-p evil-escape-major-mode-blacklist))
