@@ -9,7 +9,7 @@
 ;; Keywords: convenience editing evil
 ;; Created: 22 Oct 2014
 ;; Version: 3.15
-;; Package-Requires: ((emacs "24") (evil "1.0.9") (cl-lib "0.5"))
+;; Package-Requires: ((emacs "24") (evil "1.0.9") (cl-lib "0.5") (dash "2.19.1")
 ;; URL: https://github.com/syl20bnr/evil-escape
 
 ;; This file is not part of GNU Emacs.
