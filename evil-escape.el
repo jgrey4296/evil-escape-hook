@@ -218,8 +218,11 @@ and intercept them if they match the evil-escape-key-sequence "
             (esc-fun (evil-escape--get-appropriate-func)))
         (when esc-fun
           (when (and (memq this-command evil-escape-delete-char-on-fns)
-                     (not buffer-read-only))
-            (delete-char -1))
+                     (not buffer-read-only)
+                     (not (get-text-property (point) 'read-only))
+                     )
+            (delete-char -1)
+            )
           ;; Because this is in pre-command-hook,
           ;; setting this-command and this-original-command changes what will happen
           (setq this-command esc-fun
