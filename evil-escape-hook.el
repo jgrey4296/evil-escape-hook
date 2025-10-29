@@ -1,16 +1,13 @@
- ;;; evil-escape.el --- Escape from anything with a customizable key sequence -*- lexical-binding: t; -*-
+;;; evil-escape-hook.el --- Evil Escape, but with a hook and cleaned up -*- lexical-binding: t; -*-
 
-;; Forked and Refactored 2023 by John Grey
-
-;; Original:
 ;; Copyright (C) 2014-2015 syl20bnr
-;;
-;; Author: Sylvain Benner <sylvain.benner@gmail.com>
+
+;; Author: John Grey
 ;; Keywords: convenience editing evil
 ;; Created: 22 Oct 2014
-;; Version: 3.15
-;; Package-Requires: ((emacs "24") (evil "1.0.9") (cl-lib "0.5") (dash "2.19.1")
-;; URL: https://github.com/syl20bnr/evil-escape
+;; Version: 1.0.0
+;; Package-Requires: ((emacs "24") (evil "1.0.9") (cl-lib "0.5") (dash "2.19.1"))
+;; URL: https://github.com/jgrey4296/evil-escape-hook
 
 ;; This file is not part of GNU Emacs.
 
@@ -28,6 +25,7 @@
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ;;; Commentary:
+;; Forked and Refactored 2023 by John Grey
 
 ;; Press `fd` quickly to:
 ;; ----------------------
@@ -350,6 +348,5 @@ TODO make this a lookup by mode
            )
   )
 
-(provide 'evil-escape)
-
-;;; evil-escape.el ends here
+(provide 'evil-escape-hook)
+;;; evil-escape-hook.el ends here
